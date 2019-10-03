@@ -39,7 +39,7 @@
 
 #define CHILD_MODE_LED_PIN 6
 #define CHILD_SWITCH_PIN 7
-#define CHILD_MODE_SAFETY_MARGIN 20
+#define CHILD_MODE_SAFETY_MARGIN 40
 
 #define PS2_CONTROLLER_CLOCK_PIN 13
 #define PS2_CONTROLLER_COMMAND_PIN 32
@@ -67,7 +67,7 @@ bool isNewParadeBot = false;
 // based on the current Child Mode setting. We've also found that full
 // forward and reverse was too fast to control the robot safely so
 // we are going to decrease the max range here. The Child Mode setting
-// will always be a percentage of this initial value.
+// will always less than this initial value.
 int adjustedServoFullForward = SERVO_FULL_FORWARD + SERVO_SAFETY_MARGIN;
 int adjustedServoFullReverse = SERVO_FULL_REVERSE - SERVO_SAFETY_MARGIN;
 
@@ -338,15 +338,15 @@ void handleDriveMotors()
   int leftMotorAngle = SERVO_STOPPED;
   int rightMotorAngle = SERVO_STOPPED;
 
-  leftMotorAngle =
-    map(nMotMixL, 127, -128, adjustedServoFullForward, adjustedServoFullReverse);
+  //leftMotorAngle =
+  //  map(nMotMixL, 127, -128, adjustedServoFullForward, adjustedServoFullReverse);
 
   // The left motor is mounted 180 degrees different from
   // the right motor, so we need to reverse the values being
   // sent to it. This eliminates the need for "null modem"
   // cables being installed inline to the left motors.
-  //leftMotorAngle =
-  //  map(nMotMixL, 127, -128, adjustedServoFullReverse, adjustedServoFullForward);
+  leftMotorAngle =
+    map(nMotMixL, 127, -128, adjustedServoFullReverse, adjustedServoFullForward);
 
   rightMotorAngle =
     map(nMotMixR, 127, -128, adjustedServoFullForward, adjustedServoFullReverse);
