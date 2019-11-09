@@ -118,7 +118,6 @@ Servo rightDriveMotor, leftDriveMotor, candyShooterMotor;
  **************************************************************/
 void setup()
 {
-
   Serial.begin(9600);
   delay(3000); // power-up safety delay
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
@@ -409,6 +408,9 @@ void handleDriveMotors()
     rightMotorAngle = SERVO_STOPPED;
   }
 
+  leftDriveMotor.write(leftMotorAngle);
+  rightDriveMotor.write(rightMotorAngle);
+
   if((nPivSpeed == 0) && (isNewParadeBot == false))
   {
     if(leftMotorAngle > SERVO_STOPPED)
@@ -424,10 +426,6 @@ void handleDriveMotors()
       // do nothing
     }
   }
-  
-  leftDriveMotor.write(leftMotorAngle);
-  rightDriveMotor.write(rightMotorAngle);
-
 }
 
 void doLeds()
