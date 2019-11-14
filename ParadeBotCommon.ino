@@ -24,8 +24,7 @@ static const int SERVO_FULL_REVERSE = 180;
 static const int SERVO_STOPPED = 90;
 static const int SERVO_FULL_FORWARD = 0;
 static const int SERVO_DEADBAND = 2;
-//static const int SERVO_SAFETY_MARGIN = 20;
-static const int SERVO_SAFETY_MARGIN = 0;
+static const int SERVO_SAFETY_MARGIN = 20;
 
 static const double PS2_CONTROLLER_MINIMUM_VALUE = 0.0;   // Stick is all the way up
 static const double PS2_CONTROLLER_NEUTRAL_VALUE = 127.0; // Stick is centered
