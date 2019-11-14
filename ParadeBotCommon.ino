@@ -24,7 +24,8 @@ static const int SERVO_FULL_REVERSE = 180;
 static const int SERVO_STOPPED = 90;
 static const int SERVO_FULL_FORWARD = 0;
 static const int SERVO_DEADBAND = 2;
-static const int SERVO_SAFETY_MARGIN = 20;
+//static const int SERVO_SAFETY_MARGIN = 20;
+static const int SERVO_SAFETY_MARGIN = 0;
 
 static const double PS2_CONTROLLER_MINIMUM_VALUE = 0.0;   // Stick is all the way up
 static const double PS2_CONTROLLER_NEUTRAL_VALUE = 127.0; // Stick is centered
@@ -408,6 +409,13 @@ void handleDriveMotors()
   nMotMixL = (1.0 - fPivScale) * nMotPremixL + fPivScale * ( nPivSpeed);
   nMotMixR = (1.0 - fPivScale) * nMotPremixR + fPivScale * (-nPivSpeed);
 
+/*
+  Serial.print("nJoyY: " );
+  Serial.print(nJoyY);
+  Serial.print(" nPivSpeed: " );
+  Serial.print(nPivSpeed);
+  */
+  
   // Convert to Motor PWM range
   int leftMotorAngle = SERVO_STOPPED;
   int rightMotorAngle = SERVO_STOPPED;
@@ -439,39 +447,86 @@ void handleDriveMotors()
     rightMotorAngle = SERVO_STOPPED;
   }
 
-  /*
-    Serial.println("Changing leftMotorAngle to: ");
-    Serial.println(leftMotorAngle);
-    Serial.println("Changing rightMotorAngle to: ");
-    Serial.println(rightMotorAngle);
-  */
-
-  if ((nPivSpeed == 0) && (isNewParadeBot == false))
+  if (isNewParadeBot == false)
   {
-    if (leftMotorAngle > SERVO_STOPPED)
+    // On the old parade bot, for some reason the right motor
+    // is faster than the left so we're going to give the left
+    // motor a little extra gas here ...
+    if (nPivSpeed == 0) // We are NOT turning
     {
-      leftMotorAngle += TURN_COMPENSATION;
+      if (leftMotorAngle > SERVO_STOPPED)
+      {
+        leftMotorAngle += TURN_COMPENSATION;
+      }
+      else if (leftMotorAngle < SERVO_STOPPED)
+      {
+        leftMotorAngle -= TURN_COMPENSATION;
+      }
+      else
+      {
+        // do nothing
+      }
     }
-    else if (leftMotorAngle < SERVO_STOPPED)
+    else // We are turning
     {
-      leftMotorAngle -= TURN_COMPENSATION;
+      // When approaching maximum forward or reverse speed and
+      // you also apply maximum turn in one direction or the
+      // other, one of the two motors is commanded to its 'stop'
+      // position. This has the effect of not being able to turn
+      // at high speeds. We want to clip the settings such that
+      // each motor is never commanded to completely stop when 
+      // the robot is turning. We will add or subtract 1 just to
+      // give the motor a little bit of juice and hopefully keep
+      // it out of full stop/brake mode.
+
+      // First make sure we're not just turning in place
+      if ((nJoyY != 0) && (nPivSpeed != 0))
+      {
+        // Correct Left Motor
+        if (nJoyY > 0) // moving forward so leftMotorAngle is 90 to 180 here
+        {
+          if ((leftMotorAngle >= SERVO_STOPPED) &&
+              (leftMotorAngle <= (SERVO_STOPPED + SERVO_DEADBAND)))
+          {
+            leftMotorAngle = SERVO_STOPPED + SERVO_DEADBAND + 1;
+          }
+        }
+        else // nJoy < 0, moving backward so leftMotorAngle is 0 to 90 here
+        {
+          if ((leftMotorAngle <= SERVO_STOPPED) &&
+              (leftMotorAngle >= (SERVO_STOPPED - SERVO_DEADBAND)))
+          {
+            leftMotorAngle = SERVO_STOPPED - SERVO_DEADBAND - 1;
+          }
+        }
+
+        // Correct Right Motor
+        if (nJoyY > 0) // moving forward so rightMotorAngle is 0 to 90 here
+        {
+          if ((rightMotorAngle <= SERVO_STOPPED) &&
+              (rightMotorAngle >= (SERVO_STOPPED - SERVO_DEADBAND)))
+          {
+            rightMotorAngle = SERVO_STOPPED - SERVO_DEADBAND - 1;
+          }
+        }
+        else // nJoy < 0, moving backward so rightMotorAngle is 90 to 180 here
+        {
+          if ((rightMotorAngle >= SERVO_STOPPED) &&
+              (rightMotorAngle <= (SERVO_STOPPED + SERVO_DEADBAND)))
+          {
+            rightMotorAngle = SERVO_STOPPED + SERVO_DEADBAND + 1;
+          }
+        }
+      }
     }
-    else
-    {
-      // do nothing
-    }
-    /*
-        Serial.print("Modified leftMotorAngle: " );
-        Serial.print(leftMotorAngle);
-        Serial.print(" **** MOdified rightMotorAngle: " );
-        Serial.println(rightMotorAngle);
-    */
   }
 
-  Serial.print("Writing leftMotorAngle: " );
+/*
+  Serial.print(" **** Writing leftMotorAngle: " );
   Serial.print(leftMotorAngle);
   Serial.print(" **** Writing rightMotorAngle: " );
   Serial.println(rightMotorAngle);
+  */
 
   leftDriveMotor.write(leftMotorAngle);
   rightDriveMotor.write(rightMotorAngle);
