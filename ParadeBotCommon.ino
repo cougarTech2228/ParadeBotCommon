@@ -3,19 +3,6 @@
 #include <color.h>
 #include <PS2X_lib.h>
 
-#define LED_PIN     5
-#define NUM_LEDS    120
-#define BRIGHTNESS  64
-#define LED_TYPE    WS2811
-#define COLOR_ORDER GRB
-CRGB leds[NUM_LEDS];
-
-PS2X ps2x;
-byte vibrate = 0;
-#define ADDITIONAL_LOOP_DELAY_MS 100 // For PS2 button presses to be recognized, 100 ms seems pretty good
-
-#define UPDATES_PER_SECOND 10
-
 // The library for driving the LED strips, FastLED can
 // be found here: https://github.com/FastLED/FastLED
 
@@ -28,6 +15,60 @@ byte vibrate = 0;
 
 // For PS2 button presses to be recognized, 100 ms seems pretty good
 
+static const int ADDITIONAL_LOOP_DELAY_MS = 100; // For PS2 button presses to be recognized, 100 ms seems pretty good
+static const int UPDATES_PER_SECOND = 10;
+static const int LOOP_DELAY_FOR_PS2_BUTTON_DEBOUNCE_MS = 100;
+static const int LOOP_COUNTS_TO_HOLD_CANDY_SOLENOID_PIN_ACTIVE = 10;
+
+static const int SERVO_FULL_REVERSE = 180;
+static const int SERVO_STOPPED = 90;
+static const int SERVO_FULL_FORWARD = 0;
+static const int SERVO_DEADBAND = 2;
+static const int SERVO_SAFETY_MARGIN = 20;
+
+static const double PS2_CONTROLLER_MINIMUM_VALUE = 0.0;   // Stick is all the way up
+static const double PS2_CONTROLLER_NEUTRAL_VALUE = 127.0; // Stick is centered
+static const double PS2_CONTROLLER_MAXIMUM_VALUE = 255.0; // Stick is all the way down
+
+static const int CANDY_SHOOTER_SOLENOID_PIN = 12;
+static const int LEFT_DRIVE_MOTOR_PIN = 10;
+static const int RIGHT_DRIVE_MOTOR_PIN = 9;
+static const int CANDY_SHOOTER_MOTOR_PIN = 8;
+
+static const int CANDY_SHOOTER_MOTOR_STATE_OFF = 0;
+static const int CANDY_SHOOTER_MOTOR_STATE_ON = 1;
+static const int CANDY_SHOOTER_MOTOR_SPEED = 150;
+
+static const int PARADE_BOT_TYPE_PIN = 4;
+
+static const int CHILD_MODE_LED_PIN = 6;
+static const int CHILD_SWITCH_PIN = 7;
+static const int CHILD_MODE_SAFETY_MARGIN = 40;
+
+static const int PS2_CONTROLLER_CLOCK_PIN = 13;
+static const int PS2_CONTROLLER_COMMAND_PIN = 32;
+static const int PS2_CONTROLLER_ATTENTION_PIN = 30;
+static const int PS2_CONTROLLER_DATA_PIN = 38;
+
+static const int MIN_PWM_SIGNAL_WIDTH = 1000;
+static const int MAX_PWM_SIGNAL_WIDTH = 2000;
+
+static const int TURN_COMPENSATION = 7;
+
+// LED Constants
+static const int LED_PIN = 5;
+static const int NUM_LEDS = 120;
+static const int BRIGHTNESS = 64;
+static const int HEAT_INDEX = 255;
+
+#define LED_TYPE WS2811
+#define COLOR_ORDER GRB
+
+
+// PS2 Game Controller Instance
+PS2X ps2x;
+byte vibrate = 0;
+CRGB leds[NUM_LEDS];
 
 CRGBPalette16 currentPalette;
 TBlendType    currentBlending;
@@ -35,64 +76,24 @@ TBlendType    currentBlending;
 extern CRGBPalette16 myRedWhiteBluePalette;
 extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
 
-enum LEDPresets 
+enum LEDPresets
 {
-  fullRed, fullWhite, fullYellow, fullGreen, fullBlue, fillRedAndGreen, flashRedAndGreen, redWhiteAndBlue, rainbow, flashRainbow
+  fullRed, fullWhite, fullYellow, fullGreen, fullBlue,
+  fillRedAndGreen, flashRedAndGreen, redWhiteAndBlue, rainbow,
+  flashRainbow
 };
 
 static uint8_t startIndex = 0;
-DEFINE_GRADIENT_PALETTE( heatmap_gp ) 
+DEFINE_GRADIENT_PALETTE( heatmap_gp )
 {
   //0,     0,    0,    0,   //black
-  //128,   255,  0,    0,   //red
+  //128,   20
+  5,  0,    0,   //red
   //224,   255,  255,  0,   //bright yellow
   255,   255,  255,  255
 }; //full white
 CRGBPalette16 myPal = heatmap_gp;
-uint8_t heatindex = (255);
 
-#define LOOP_DELAY_FOR_PS2_BUTTON_DEBOUNCE_MS 100
-
-#define LOOP_COUNTS_TO_HOLD_CANDY_SOLENOID_PIN_ACTIVE 10
-
-#define SERVO_FULL_REVERSE 180
-#define SERVO_STOPPED 90
-#define SERVO_FULL_FORWARD 0
-#define SERVO_DEADBAND 2
-#define SERVO_SAFETY_MARGIN 20
-
-#define PS2_CONTROLLER_MINIMUM_VALUE 0.0   // Stick is all the way up
-#define PS2_CONTROLLER_NEUTRAL_VALUE 127.0 // Stick is centered 
-#define PS2_CONTROLLER_MAXIMUM_VALUE 255.0 // Stick is all the way down
-
-#define CANDY_SHOOTER_SOLENOID_PIN 12
-#define LEFT_DRIVE_MOTOR_PIN 10
-#define RIGHT_DRIVE_MOTOR_PIN 9
-#define CANDY_SHOOTER_MOTOR_PIN 8
-
-#define CANDY_SHOOTER_MOTOR_STATE_OFF 0
-#define CANDY_SHOOTER_MOTOR_STATE_ON 1
-#define CANDY_SHOOTER_MOTOR_SPEED 150
-
-#define PARADE_BOT_TYPE_PIN 4
-
-#define CHILD_MODE_LED_PIN 6
-#define CHILD_SWITCH_PIN 7
-#define CHILD_MODE_SAFETY_MARGIN 40
-
-#define PS2_CONTROLLER_CLOCK_PIN 13
-#define PS2_CONTROLLER_COMMAND_PIN 32
-#define PS2_CONTROLLER_ATTENTION_PIN 30
-#define PS2_CONTROLLER_DATA_PIN 38
-
-#define MIN_PWM_SIGNAL_WIDTH 1000
-#define MAX_PWM_SIGNAL_WIDTH 2000
-
-#define TURN_COMPENSATION 7;
-
-// PS2 Game Controller Instance
-
-double RY = PS2_CONTROLLER_NEUTRAL_VALUE;
 double RX = PS2_CONTROLLER_NEUTRAL_VALUE;
 double LY = PS2_CONTROLLER_NEUTRAL_VALUE;
 
@@ -242,7 +243,6 @@ void loop()
   FastLED.show();
   FastLED.delay(UPDATES_PER_SECOND);
   delay(LOOP_DELAY_FOR_PS2_BUTTON_DEBOUNCE_MS);
-  
 }
 
 /*************************************************************
@@ -338,13 +338,20 @@ void handleDriveMotors()
   //                away from the X-axis (Y=0). A greater value will assign
   //                more of the joystick's range to pivot actions.
   //                Allowable range: (0..+127)
-  double fPivYLimit = 32.0;
+  static const double PIV_Y_LIMIT = 32.0;
 
   // TEMP VARIABLES
   double   nMotPremixL;    // Motor (left)  premixed output        (-128..+127)
   double   nMotPremixR;    // Motor (right) premixed output        (-128..+127)
   int      nPivSpeed;      // Pivot Speed                          (-128..+127)
   double   fPivScale;      // Balance scale b/w drive and pivot    (   0..1   )
+
+  /*
+    Serial.print("LY: ");
+    Serial.print(LY);
+    Serial.print(" RX: ");
+    Serial.println(RX);
+  */
 
   nJoyY = map(LY, PS2_CONTROLLER_MINIMUM_VALUE, PS2_CONTROLLER_MAXIMUM_VALUE, 127, -128);
   nJoyX = map(RX, PS2_CONTROLLER_MINIMUM_VALUE, PS2_CONTROLLER_MAXIMUM_VALUE, -128, 127);
@@ -353,14 +360,30 @@ void handleDriveMotors()
   if (nJoyY >= 0)
   {
     // Forward
-    nMotPremixL = (nJoyX >= 0) ? 127.0 : (127.0 + nJoyX);
-    nMotPremixR = (nJoyX >= 0) ? (127.0 - nJoyX) : 127.0;
+    if (nJoyX >= 0)
+    {
+      nMotPremixL = 127.0;
+      nMotPremixR = 127.0 - nJoyX;
+    }
+    else
+    {
+      nMotPremixL = 127.0 + nJoyX;
+      nMotPremixR = 127.0;
+    }
   }
   else
   {
     // Reverse
-    nMotPremixL = (nJoyX >= 0) ? (127.0 - nJoyX) : 127.0;
-    nMotPremixR = (nJoyX >= 0) ? 127.0 : (127.0 + nJoyX);
+    if (nJoyX >= 0)
+    {
+      nMotPremixL = 127 - nJoyX;
+      nMotPremixR = 127.0;
+    }
+    else
+    {
+      nMotPremixL = 127.0;
+      nMotPremixR = 127.0 + nJoyX;
+    }
   }
 
   // Scale Drive output due to Joystick Y input (throttle)
@@ -371,7 +394,15 @@ void handleDriveMotors()
   // - Strength of pivot (nPivSpeed) based on Joystick X input
   // - Blending of pivot vs drive (fPivScale) based on Joystick Y input
   nPivSpeed = nJoyX;
-  fPivScale = (abs(nJoyY) > fPivYLimit) ? 0.0 : (1.0 - abs(nJoyY) / fPivYLimit);
+
+  if (abs(nJoyY) > PIV_Y_LIMIT)
+  {
+    fPivScale = 0.0;
+  }
+  else
+  {
+    fPivScale = (1.0 - abs(nJoyY) / PIV_Y_LIMIT);
+  }
 
   // Calculate final mix of Drive and Pivot
   nMotMixL = (1.0 - fPivScale) * nMotPremixL + fPivScale * ( nPivSpeed);
@@ -408,92 +439,104 @@ void handleDriveMotors()
     rightMotorAngle = SERVO_STOPPED;
   }
 
-  leftDriveMotor.write(leftMotorAngle);
-  rightDriveMotor.write(rightMotorAngle);
+  /*
+    Serial.println("Changing leftMotorAngle to: ");
+    Serial.println(leftMotorAngle);
+    Serial.println("Changing rightMotorAngle to: ");
+    Serial.println(rightMotorAngle);
+  */
 
-  if((nPivSpeed == 0) && (isNewParadeBot == false))
+  if ((nPivSpeed == 0) && (isNewParadeBot == false))
   {
-    if(leftMotorAngle > SERVO_STOPPED)
+    if (leftMotorAngle > SERVO_STOPPED)
     {
       leftMotorAngle += TURN_COMPENSATION;
     }
-    else if(leftMotorAngle < SERVO_STOPPED)
+    else if (leftMotorAngle < SERVO_STOPPED)
     {
       leftMotorAngle -= TURN_COMPENSATION;
     }
-    else 
+    else
     {
       // do nothing
     }
+    /*
+        Serial.print("Modified leftMotorAngle: " );
+        Serial.print(leftMotorAngle);
+        Serial.print(" **** MOdified rightMotorAngle: " );
+        Serial.println(rightMotorAngle);
+    */
   }
+
+  Serial.print("Writing leftMotorAngle: " );
+  Serial.print(leftMotorAngle);
+  Serial.print(" **** Writing rightMotorAngle: " );
+  Serial.println(rightMotorAngle);
+
+  leftDriveMotor.write(leftMotorAngle);
+  rightDriveMotor.write(rightMotorAngle);
 }
 
+/**************************************************************
+   doLeds()
+ **************************************************************/
 void doLeds()
 {
   if (ps2x.ButtonPressed(PSB_CIRCLE))
-      {
-        Serial.println("Circle is pressed");
-        FillLEDsRed();
-      }
-      else if (ps2x.ButtonPressed(PSB_L2)) 
-      {
-        Serial.println("L2 is pressed");
-        FillLEDsWhite();
-      }
-      else if (ps2x.ButtonPressed(PSB_TRIANGLE))
-      {
-        Serial.println("Triangle is pressed");
-        FillLEDsGreen();
-      }
-      else if (ps2x.ButtonPressed(PSB_CROSS))
-      {
-        Serial.println("Cross is pressed");
-        FillLEDsYellow();
-      }
-      else if (ps2x.ButtonPressed(PSB_SQUARE))
-      {
-        Serial.println("Square is pressed");
-        rainbowLEDs();
-      }
-      else if (ps2x.ButtonPressed(PSB_PAD_UP))
-      {
-        Serial.println("Up is pressed");
-        fillRedWhiteAndBlue();
-      }
-      else if (ps2x.ButtonPressed(PSB_PAD_DOWN)) 
-      {
-        Serial.println("Down is pressed");
-        FillLEDsBlue();
-      }
-      else if (ps2x.ButtonPressed(PSB_PAD_RIGHT)) 
-      {
-        Serial.println("Right is pressed");
-        flashingRedAndGreen();
-      }
-      else if (ps2x.ButtonPressed(PSB_PAD_LEFT)) 
-      {
-        Serial.println("Left is pressed");
-        redAndGreen();
-      }
-      else if (ps2x.ButtonPressed(PSB_R2)) 
-      {
-        Serial.println("R2 is pressed");
-        flashingRainbow();
-      }  
-}
-
-void FillLEDsFromPaletteColors()
-{
-  startIndex = startIndex + 20; /* motion speed */
-  uint8_t brightness = 255;
-
-  for ( int i = 0; i < NUM_LEDS; i++) 
   {
-    leds[i] = ColorFromPalette( currentPalette, startIndex, brightness, currentBlending);
-    startIndex++;
+    Serial.println("Circle is pressed");
+    fillLEDsRed();
+  }
+  else if (ps2x.ButtonPressed(PSB_L2))
+  {
+    Serial.println("L2 is pressed");
+    fillLEDsWhite();
+  }
+  else if (ps2x.ButtonPressed(PSB_TRIANGLE))
+  {
+    Serial.println("Triangle is pressed");
+    fillLEDsGreen();
+  }
+  else if (ps2x.ButtonPressed(PSB_CROSS))
+  {
+    Serial.println("Cross is pressed");
+    fillLEDsYellow();
+  }
+  else if (ps2x.ButtonPressed(PSB_SQUARE))
+  {
+    Serial.println("Square is pressed");
+    rainbowLEDs();
+  }
+  else if (ps2x.ButtonPressed(PSB_PAD_UP))
+  {
+    Serial.println("Up is pressed");
+    fillLEDsRedWhiteAndBlue();
+  }
+  else if (ps2x.ButtonPressed(PSB_PAD_DOWN))
+  {
+    Serial.println("Down is pressed");
+    fillLEDsBlue();
+  }
+  else if (ps2x.ButtonPressed(PSB_PAD_RIGHT))
+  {
+    Serial.println("Right is pressed");
+    flashingRedAndGreen();
+  }
+  else if (ps2x.ButtonPressed(PSB_PAD_LEFT))
+  {
+    Serial.println("Left is pressed");
+    redAndGreen();
+  }
+  else if (ps2x.ButtonPressed(PSB_R2))
+  {
+    Serial.println("R2 is pressed");
+    flashingRainbow();
   }
 }
 
+/**************************************************************
+   rainbowLEDs()
+ **************************************************************/
 void rainbowLEDs()
 {
   startIndex = startIndex + 1; /* motion speed */
@@ -501,236 +544,149 @@ void rainbowLEDs()
   currentBlending = LINEARBLEND;
   uint8_t brightness = 255;
 
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
     leds[i] = ColorFromPalette( currentPalette, startIndex, brightness, currentBlending);
     startIndex += 5;
   }
 }
 
-void FillLEDsRed() 
+/**************************************************************
+   fillLEDsRed()
+ **************************************************************/
+void fillLEDsRed()
 {
   currentBlending = LINEARBLEND;
   currentPalette = RainbowStripeColors_p;
   uint8_t brightness = 255;
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
     leds[i] = ColorFromPalette( currentPalette, 0, brightness, currentBlending);
   }
 }
 
-void FillLEDsWhite() 
+/**************************************************************
+   fillLEDsWhite()
+ **************************************************************/
+void fillLEDsWhite()
 {
   currentBlending = LINEARBLEND;
   currentPalette = RainbowStripeColors_p;
   uint8_t brightness = 255;
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
-    leds[i] = ColorFromPalette(myPal, heatindex);
+    leds[i] = ColorFromPalette(myPal, HEAT_INDEX);
   }
 }
 
-void FillLEDsGreen() 
+/**************************************************************
+   fillLEDsGreen()
+ **************************************************************/
+void fillLEDsGreen()
 {
   currentBlending = LINEARBLEND;
   currentPalette = RainbowStripeColors_p;
   uint8_t brightness = 255;
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
     leds[i] = ColorFromPalette( currentPalette, 95, brightness, currentBlending);
   }
 }
 
-void FillLEDsBlue() 
+/**************************************************************
+   fillLEDsBlue()
+ **************************************************************/
+void fillLEDsBlue()
 {
   currentBlending = LINEARBLEND;
   currentPalette = RainbowStripeColors_p;
   uint8_t brightness = 255;
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
     leds[i] = ColorFromPalette( currentPalette, 120, brightness, currentBlending);
   }
 }
 
-void FillLEDsYellow() 
+/**************************************************************
+   fillLEDsYellow()
+ **************************************************************/
+void fillLEDsYellow()
 {
   currentBlending = LINEARBLEND;
   currentPalette = RainbowStripeColors_p;
   uint8_t brightness = 255;
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
     leds[i] = ColorFromPalette( currentPalette, 60, brightness, currentBlending);
   }
 }
 
-void fillRedWhiteAndBlue() 
+/**************************************************************
+   fillLEDsRedWhiteAndBlue()
+ **************************************************************/
+void fillLEDsRedWhiteAndBlue()
 {
   startIndex = startIndex + 20; /* motion speed */
   uint8_t brightness = 255;
   currentPalette = myRedWhiteBluePalette_p;
   currentBlending = LINEARBLEND;
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
     leds[i] = ColorFromPalette( currentPalette, startIndex, brightness, currentBlending);
     startIndex += 1;
   }
 }
 
+/**************************************************************
+   redAndGreen()
+ **************************************************************/
 void redAndGreen()
 {
   startIndex = startIndex + 20; /* motion speed */
 
   currentBlending = LINEARBLEND;
-  SetupRedAndGreenPalette();
+  setupRedAndGreenPalette();
   uint8_t brightness = 255;
 
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
     leds[i] = ColorFromPalette( currentPalette, startIndex, brightness, currentBlending);
     startIndex += 3;
   }
 }
 
+/**************************************************************
+   flashingRedAndGreen()
+ **************************************************************/
 void flashingRedAndGreen()
 {
   startIndex = startIndex + 10; /* motion speed */
 
   currentBlending = NOBLEND;
-  SetupRedAndGreenPalette();
+  setupRedAndGreenPalette();
   uint8_t brightness = 255;
 
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
     leds[i] = ColorFromPalette( currentPalette, startIndex, brightness, currentBlending);
   }
 }
 
-void flashingRainbow() 
+/**************************************************************
+   flashingRainbow()
+ **************************************************************/
+void flashingRainbow()
 {
   startIndex = startIndex + 5; /* motion speed */
   currentPalette = RainbowStripeColors_p;
   currentBlending = LINEARBLEND;
   uint8_t brightness = 255;
 
-  for ( int i = 0; i < NUM_LEDS; i++) 
+  for ( int i = 0; i < NUM_LEDS; i++)
   {
     leds[i] = ColorFromPalette( currentPalette, startIndex, brightness, currentBlending);
   }
 }
-
-
-// There are several different palettes of colors demonstrated here.
-//
-// FastLED provides several 'preset' palettes: RainbowColors_p, RainbowStripeColors_p,
-// OceanColors_p, CloudColors_p, LavaColors_p, ForestColors_p, and PartyColors_p.
-//
-// Additionally, you can manually define your own color palettes, or you can write
-// code that creates color palettes on the fly.  All are shown here.
-
-void ChangePalettePeriodically()
-{
-  uint8_t secondHand = (millis() / 1000) % 60;
-  static uint8_t lastSecond = 99;
-
-  if ( lastSecond != secondHand) 
-  {
-    lastSecond = secondHand;
-    if ( secondHand ==  0)  
-    {
-      currentPalette = RainbowColors_p;
-      currentBlending = LINEARBLEND;
-    }
-    if ( secondHand == 10)  
-    {
-      currentPalette = RainbowStripeColors_p;
-      currentBlending = NOBLEND;
-    }
-    if ( secondHand == 15)  
-    {
-      currentPalette = RainbowStripeColors_p;
-      currentBlending = LINEARBLEND;
-    }
-    if ( secondHand == 20)  
-    {
-      SetupPurpleAndGreenPalette();
-      currentBlending = LINEARBLEND;
-    }
-    if ( secondHand == 25)  
-
-      SetupTotallyRandomPalette();
-      currentBlending = LINEARBLEND;
-    }
-    if ( secondHand == 30)  
-    {
-      SetupBlackAndWhiteStripedPalette();
-      currentBlending = NOBLEND;
-    }
-    if ( secondHand == 35)  
-    {
-      SetupBlackAndWhiteStripedPalette();
-      currentBlending = LINEARBLEND;
-    }
-    if ( secondHand == 40)  
-    {
-      currentPalette = CloudColors_p;
-      currentBlending = LINEARBLEND;
-    }
-    if ( secondHand == 45)  
-    {
-      currentPalette = PartyColors_p;
-      currentBlending = LINEARBLEND;
-    }
-    if ( secondHand == 50)  
-    {
-      currentPalette = myRedWhiteBluePalette_p;
-      currentBlending = NOBLEND;
-    }
-    if ( secondHand == 55)  
-    {
-      currentPalette = myRedWhiteBluePalette_p;
-      currentBlending = LINEARBLEND;
-    }
-  }
-
-// This function fills the palette with totally random colors.
-void SetupTotallyRandomPalette()
-{
-  for ( int i = 0; i < 16; i++) 
-  {
-    currentPalette[i] = CHSV( random8(), 255, random8());
-  }
-}
-
-// This function sets up a palette of black and white stripes,
-// using code.  Since the palette is effectively an array of
-// sixteen CRGB colors, the various fill_* functions can be used
-// to set them up.
-void SetupBlackAndWhiteStripedPalette()
-{
-  // 'black out' all 16 palette entries...
-  fill_solid( currentPalette, 16, CRGB::Black);
-  // and set every fourth one to white.
-  currentPalette[0] = CRGB::White;
-  currentPalette[4] = CRGB::White;
-  currentPalette[8] = CRGB::White;
-  currentPalette[12] = CRGB::White;
-
-}
-
-// This function sets up a palette of purple and green stripes.
-void SetupPurpleAndGreenPalette()
-{
-  CRGB purple = CHSV( HUE_PURPLE, 255, 255);
-  CRGB green  = CHSV( HUE_GREEN, 255, 255);
-  CRGB black  = CRGB::Black;
-
-  currentPalette = CRGBPalette16(
-                     green,  green,  black,  black,
-                     purple, purple, black,  black,
-                     green,  green,  black,  black,
-                     purple, purple, black,  black );
-}
-
 
 // This example shows how to set up a static color palette
 // which is stored in PROGMEM (flash), which is almost always more
@@ -758,9 +714,11 @@ const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM =
   CRGB::Black
 };
 
-void SetupRedAndGreenPalette() 
+/**************************************************************
+   setupRedAndGreenPalette()
+ **************************************************************/
+void setupRedAndGreenPalette()
 {
-
   CRGB green  = CHSV( HUE_GREEN, 255, 255);
   CRGB red = CHSV( HUE_RED, 255, 255);
   CRGB white  = CRGB::White;
